@@ -1,6 +1,5 @@
 import nu.pattern.OpenCV
-import org.opencv.core.Mat
-import org.opencv.core.Size
+import org.opencv.core.*
 import org.opencv.highgui.HighGui
 import org.opencv.imgcodecs.Imgcodecs
 import org.opencv.imgproc.Imgproc
@@ -63,8 +62,65 @@ fun resizeImage(
 fun gaussianBlur(
     src: Mat
 ): Mat {
-    val dst = Mat()
+    // az eredeti kép szürkeskálássá alakítása
+    val graySrc = Mat()
+    Imgproc.cvtColor(src, graySrc, Imgproc.COLOR_BGR2GRAY)
 
-    Imgproc.GaussianBlur(src, dst, Size(3.0, 3.0), 0.0)
-    return dst
+    // a transzformációhoz optimális képméret meghatározása (a gyorsaság miatt szükséges)
+    val paddedSrc = Mat()
+    val m = Core.getOptimalDFTSize(graySrc.rows())
+    val n = Core.getOptimalDFTSize(graySrc.cols())
+    // a szegélyen lévő új elemek kitöltése 0 értékekkel
+    Core.copyMakeBorder(
+        graySrc,
+        paddedSrc,
+        0,
+        m - graySrc.rows(),
+        0,
+        n - graySrc.cols(),
+        Core.BORDER_CONSTANT,
+        Scalar.all(0.0)
+    )
+
+    // komplex komponensek létrehozása
+    val planes: MutableList<Mat> = ArrayList()
+    paddedSrc.convertTo(paddedSrc, CvType.CV_32F)
+    planes.add(paddedSrc)
+    planes.add(Mat.zeros(paddedSrc.size(), CvType.CV_32F))
+
+    // komplex kép összeállítása
+    val complexSrc = Mat()
+    Core.merge(planes, complexSrc)
+
+    // Fourier transzformáció
+    Core.dft(complexSrc, complexSrc)
+
+    // **** SZŰRÉS ****
+
+    // szűrő kép létrehozása (ugyanolyan méretű és típusú kell legyen, mint a complexSrc)
+    // HIÁNYZÓ RÉSZ: csupa 1 érték helyett a megfelelő Gauss értékek legyenek a szűrő képben
+    val filterImg = Mat.ones(complexSrc.size(), complexSrc.type())
+
+    // a transzformált kép és a szűrő kép elemenként történő összeszorzása
+    Core.mulSpectrums(complexSrc, filterImg, complexSrc, 0)
+
+    // **** SZŰRÉS vége ****
+
+    // inverz Fourier transzformáció
+    Core.idft(complexSrc, complexSrc)
+
+    // komplex komponensek kiemelése
+    Core.split(complexSrc, planes)
+
+    // valós értékek normalizálása
+    var restoredSrc = Mat()
+    Core.normalize(planes[0], restoredSrc, 0.0, 255.0, Core.NORM_MINMAX)
+
+    // szegélyek eldobása
+    restoredSrc = restoredSrc.submat(Rect(0, 0, src.cols(), src.rows()))
+
+    // a normalizált kép visszalakaítása szürkeskálássá
+    restoredSrc.convertTo(restoredSrc, CvType.CV_8U)
+
+    return restoredSrc
 }
