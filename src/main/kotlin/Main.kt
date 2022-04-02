@@ -5,6 +5,7 @@ import org.opencv.imgcodecs.Imgcodecs
 import org.opencv.imgproc.Imgproc
 import java.awt.Dimension
 import java.awt.Toolkit
+import kotlin.math.floor
 import kotlin.system.exitProcess
 
 const val WINDOW_NAME_ORIGINAL = "Image (original)"
@@ -16,7 +17,7 @@ fun main() {
     val screenDimension = Toolkit.getDefaultToolkit().screenSize
     initWindows(screenDimension)
 
-    val img = Imgcodecs.imread("./Pictures/dog.jpg", Imgcodecs.IMREAD_COLOR)
+    val img = Imgcodecs.imread("./Pictures/skate.webp", Imgcodecs.IMREAD_COLOR)
     processImage(img, screenDimension)
 
     HighGui.waitKey()
@@ -99,7 +100,20 @@ fun gaussianBlur(
 
     // szűrő kép létrehozása (ugyanolyan méretű és típusú kell legyen, mint a complexSrc)
     // HIÁNYZÓ RÉSZ: csupa 1 érték helyett a megfelelő Gauss értékek legyenek a szűrő képben
-    val filterImg = Mat.ones(complexSrc.size(), complexSrc.type())
+
+    // Próba 1: csupa 1 érték, az végső kép változatlan
+    //val filterImg = Mat.ones(complexSrc.size(), complexSrc.type())
+
+    // Próba 2: csupa 0 érték, az végső kép teljesen üres (fekete)
+    //val filterImg = Mat.ones(complexSrc.size(), complexSrc.type())
+
+    // Próba 3: csupa 1 érték középen, csupa 0 érték azon kívül
+    val filterImg = Mat.zeros(complexSrc.size(), complexSrc.type())
+    for (i in 1..filterImg.rows())
+        for (j in 1..filterImg.cols())
+            if (i > floor(filterImg.rows() * 0.25) && i < floor(filterImg.rows() * 0.75))
+                if (j > floor(filterImg.cols() * 0.25) && j < floor(filterImg.cols() * 0.75))
+                    filterImg.put(i, j, 1.0, 0.0)
 
     // a transzformált kép és a szűrő kép elemenként történő összeszorzása
     Core.mulSpectrums(complexSrc, filterImg, complexSrc, 0)
