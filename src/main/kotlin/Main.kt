@@ -16,8 +16,8 @@ fun main() {
     val screenDimension = Toolkit.getDefaultToolkit().screenSize
     initWindows(screenDimension)
 
-    val kernel = gaussianKernel()
-    kernel.print()
+    val kernelEx = gaussianKernelEx(3, Size(5.0, 5.0))
+    kernelEx.print()
 
     val img = Imgcodecs.imread("./Pictures/skate.webp", Imgcodecs.IMREAD_COLOR)
     processImage(img, screenDimension)
@@ -141,14 +141,36 @@ fun gaussianBlur(
     return restoredSrc
 }
 
-fun gaussianKernel(): Mat {
-    val kernel = Imgproc.getGaussianKernel(3, 0.0)
+fun gaussianKernel(
+    ksize: Int = 3
+): Mat {
+    val kernel = Imgproc.getGaussianKernel(ksize, 0.0)
     val kernelT = Mat()
     Core.transpose(kernel, kernelT)
 
     val product = Mat()
     Core.gemm(kernel, kernelT, 1.0, Mat(), 0.0, product, 0)
     return product
+}
+
+fun gaussianKernelEx(
+    ksize: Int,
+    size: Size
+): Mat {
+    val kernel = gaussianKernel(ksize)
+    val kernelEx = Mat()
+    Core.copyMakeBorder(
+        kernel,
+        kernelEx,
+        0,
+        size.height.toInt() - kernel.rows(),
+        0,
+        size.width.toInt() - kernel.cols(),
+        Core.BORDER_CONSTANT,
+        Scalar.all(0.0)
+    )
+
+    return kernelEx
 }
 
 fun Mat.print() {
