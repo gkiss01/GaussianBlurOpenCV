@@ -10,6 +10,8 @@ import kotlin.system.exitProcess
 const val WINDOW_NAME_ORIGINAL = "Image (original)"
 const val WINDOW_NAME_PROCESSED = "Image (GaussianBlur)"
 
+const val IMAGE_BLUR_BORDER_PADDING = 25
+
 fun main() {
     OpenCV.loadLocally()
 
@@ -44,7 +46,7 @@ fun processImage(
     resizeImage(src, screenDimension.width / 2, screenDimension.height / 2)
     HighGui.imshow(WINDOW_NAME_ORIGINAL, src)
 
-    val blurImg = gaussianBlurColored(src, ksize = 15)
+    val blurImg = gaussianBlurColored(src, ksize = 5)
     HighGui.imshow(WINDOW_NAME_PROCESSED, blurImg)
 }
 
@@ -121,10 +123,10 @@ fun prepareFourierTransformation(
     Core.copyMakeBorder(
         graySrc,
         paddedSrc,
-        0,
-        m - graySrc.rows(),
-        0,
-        n - graySrc.cols(),
+        IMAGE_BLUR_BORDER_PADDING,
+        m - graySrc.rows() + IMAGE_BLUR_BORDER_PADDING,
+        IMAGE_BLUR_BORDER_PADDING,
+        n - graySrc.cols() + IMAGE_BLUR_BORDER_PADDING,
         Core.BORDER_REPLICATE
     )
 
@@ -165,7 +167,14 @@ fun inverseFourierTransformation(
     Core.normalize(planes[0], restoredSrc, 0.0, 255.0, Core.NORM_MINMAX)
 
     // az előkészítés során hozzáadott szegélyek eldobása
-    restoredSrc = restoredSrc.submat(Rect(0, 0, originalSize.width.toInt(), originalSize.height.toInt()))
+    restoredSrc = restoredSrc.submat(
+        Rect(
+            IMAGE_BLUR_BORDER_PADDING,
+            IMAGE_BLUR_BORDER_PADDING,
+            originalSize.width.toInt(),
+            originalSize.height.toInt()
+        )
+    )
 
     // a normalizált kép visszalakaítása szürkeskálássá
     restoredSrc.convertTo(restoredSrc, CvType.CV_8U)
