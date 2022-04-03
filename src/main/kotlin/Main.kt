@@ -16,9 +16,6 @@ fun main() {
     val screenDimension = Toolkit.getDefaultToolkit().screenSize
     initWindows(screenDimension)
 
-    val kernelEx = gaussianKernelEx(3, Size(5.0, 5.0))
-    kernelEx.print()
-
     val img = Imgcodecs.imread("./Pictures/skate.webp", Imgcodecs.IMREAD_COLOR)
     processImage(img, screenDimension)
 
@@ -47,7 +44,7 @@ fun processImage(
     resizeImage(src, screenDimension.width / 2, screenDimension.height / 2)
     HighGui.imshow(WINDOW_NAME_ORIGINAL, src)
 
-    val blurImg = gaussianBlur(src)
+    val blurImg = gaussianBlurColored(src, ksize = 5)
     HighGui.imshow(WINDOW_NAME_PROCESSED, blurImg)
 }
 
@@ -60,6 +57,25 @@ fun resizeImage(
         .coerceAtMost(maxHeight / src.height().toDouble())
         .coerceAtMost(1.0)
     Imgproc.resize(src, src, Size(0.0, 0.0), scale, scale)
+}
+
+fun gaussianBlurColored(
+    src: Mat,
+    ksize: Int = 5
+): Mat {
+    // a kép csatornákra bontása => szürkeslálás képek halmaza
+    val channels: MutableList<Mat> = ArrayList()
+    Core.split(src, channels)
+
+    // elmosás minden egyes csatornán
+    for (i in 0 until channels.size)
+        channels[i] = gaussianBlur(channels[i], ksize)
+
+    // színes kép visszanyerése a csatornák összefűzésével
+    val result = Mat()
+    Core.merge(channels, result)
+
+    return result
 }
 
 fun gaussianBlur(
@@ -92,8 +108,9 @@ fun prepareFourierTransformation(
     src: Mat
 ): Mat {
     // az eredeti kép szürkeskálássá alakítása
-    val graySrc = Mat()
-    Imgproc.cvtColor(src, graySrc, Imgproc.COLOR_BGR2GRAY)
+    var graySrc = Mat()
+    if (src.type() == CvType.CV_8U) graySrc = src.clone()
+    else Imgproc.cvtColor(src, graySrc, Imgproc.COLOR_BGR2GRAY)
 
     // a transzformációhoz optimális képméret meghatározása (a gyorsaság miatt szükséges)
     val m = Core.getOptimalDFTSize(graySrc.rows())
