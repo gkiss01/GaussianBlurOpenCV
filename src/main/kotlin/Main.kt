@@ -65,6 +65,40 @@ fun resizeImage(
 fun gaussianBlur(
     src: Mat
 ): Mat {
+    // Fourier transzformáció
+    val complexSrc = fourierTransformation(src)
+
+    // **** SZŰRÉS ****
+
+    // szűrő kép létrehozása (ugyanolyan méretű és típusú kell legyen, mint a complexSrc)
+    // HIÁNYZÓ RÉSZ: csupa 1 érték helyett a megfelelő Gauss értékek legyenek a szűrő képben
+
+    // Próba 1: csupa 1 érték, az végső kép változatlan
+    val filterImg = Mat.ones(complexSrc.size(), complexSrc.type())
+
+    // Próba 2: csupa 0 érték, az végső kép teljesen üres (fekete)
+    //val filterImg = Mat.ones(complexSrc.size(), complexSrc.type())
+
+    // Próba 3: csupa 1 érték középen, csupa 0 érték azon kívül
+//    val filterImg = Mat.zeros(complexSrc.size(), complexSrc.type())
+//    for (i in 1..filterImg.rows())
+//        for (j in 1..filterImg.cols())
+//            if (i > floor(filterImg.rows() * 0.25) && i < floor(filterImg.rows() * 0.75))
+//                if (j > floor(filterImg.cols() * 0.25) && j < floor(filterImg.cols() * 0.75))
+//                    filterImg.put(i, j, 1.0, 0.0)
+
+    // a transzformált kép és a szűrő kép elemenként történő összeszorzása
+    Core.mulSpectrums(complexSrc, filterImg, complexSrc, 0)
+
+    // **** SZŰRÉS vége ****
+
+    // inverz Fourier transzformáció
+    return inverseFourierTransformation(complexSrc, src.size())
+}
+
+fun fourierTransformation(
+    src: Mat
+): Mat {
     // az eredeti kép szürkeskálássá alakítása
     val graySrc = Mat()
     Imgproc.cvtColor(src, graySrc, Imgproc.COLOR_BGR2GRAY)
@@ -97,35 +131,18 @@ fun gaussianBlur(
 
     // Fourier transzformáció
     Core.dft(complexSrc, complexSrc)
+    return complexSrc
+}
 
-    // **** SZŰRÉS ****
-
-    // szűrő kép létrehozása (ugyanolyan méretű és típusú kell legyen, mint a complexSrc)
-    // HIÁNYZÓ RÉSZ: csupa 1 érték helyett a megfelelő Gauss értékek legyenek a szűrő képben
-
-    // Próba 1: csupa 1 érték, az végső kép változatlan
-    val filterImg = Mat.ones(complexSrc.size(), complexSrc.type())
-
-    // Próba 2: csupa 0 érték, az végső kép teljesen üres (fekete)
-    //val filterImg = Mat.ones(complexSrc.size(), complexSrc.type())
-
-    // Próba 3: csupa 1 érték középen, csupa 0 érték azon kívül
-//    val filterImg = Mat.zeros(complexSrc.size(), complexSrc.type())
-//    for (i in 1..filterImg.rows())
-//        for (j in 1..filterImg.cols())
-//            if (i > floor(filterImg.rows() * 0.25) && i < floor(filterImg.rows() * 0.75))
-//                if (j > floor(filterImg.cols() * 0.25) && j < floor(filterImg.cols() * 0.75))
-//                    filterImg.put(i, j, 1.0, 0.0)
-
-    // a transzformált kép és a szűrő kép elemenként történő összeszorzása
-    Core.mulSpectrums(complexSrc, filterImg, complexSrc, 0)
-
-    // **** SZŰRÉS vége ****
-
+fun inverseFourierTransformation(
+    complexSrc: Mat,
+    originalSize: Size
+): Mat {
     // inverz Fourier transzformáció
     Core.idft(complexSrc, complexSrc)
 
     // komplex komponensek kiemelése
+    val planes: MutableList<Mat> = ArrayList()
     Core.split(complexSrc, planes)
 
     // valós értékek normalizálása
@@ -133,7 +150,7 @@ fun gaussianBlur(
     Core.normalize(planes[0], restoredSrc, 0.0, 255.0, Core.NORM_MINMAX)
 
     // szegélyek eldobása
-    restoredSrc = restoredSrc.submat(Rect(0, 0, src.cols(), src.rows()))
+    restoredSrc = restoredSrc.submat(Rect(0, 0, originalSize.width.toInt(), originalSize.height.toInt()))
 
     // a normalizált kép visszalakaítása szürkeskálássá
     restoredSrc.convertTo(restoredSrc, CvType.CV_8U)
