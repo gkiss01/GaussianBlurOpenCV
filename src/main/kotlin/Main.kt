@@ -16,7 +16,7 @@ fun main() {
     val screenDimension = Toolkit.getDefaultToolkit().screenSize
     initWindows(screenDimension)
 
-    val img = Imgcodecs.imread("./Pictures/skate.webp", Imgcodecs.IMREAD_COLOR)
+    val img = Imgcodecs.imread("./Pictures/dog.jpg", Imgcodecs.IMREAD_COLOR)
     processImage(img, screenDimension)
 
     HighGui.waitKey()
@@ -44,7 +44,7 @@ fun processImage(
     resizeImage(src, screenDimension.width / 2, screenDimension.height / 2)
     HighGui.imshow(WINDOW_NAME_ORIGINAL, src)
 
-    val blurImg = gaussianBlurColored(src, ksize = 5)
+    val blurImg = gaussianBlurColored(src, ksize = 15)
     HighGui.imshow(WINDOW_NAME_PROCESSED, blurImg)
 }
 
@@ -125,8 +125,7 @@ fun prepareFourierTransformation(
         m - graySrc.rows(),
         0,
         n - graySrc.cols(),
-        Core.BORDER_CONSTANT,
-        Scalar.all(0.0)
+        Core.BORDER_REPLICATE
     )
 
     return paddedSrc
