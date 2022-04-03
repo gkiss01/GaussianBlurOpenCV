@@ -63,40 +63,32 @@ fun resizeImage(
 }
 
 fun gaussianBlur(
-    src: Mat
+    src: Mat,
+    ksize: Int = 5
 ): Mat {
+    // az előkészítés változtatja a kép méretét, ezért azt elmentjük
+    val originalSize = src.size()
+
+    // kép előkészítése a Fourier transzformációhoz (két szintre vágás, méretezés)
+    val preparedSrc = prepareFourierTransformation(src)
+
     // Fourier transzformáció
-    val complexSrc = fourierTransformation(src)
+    val complexSrc = fourierTransformation(preparedSrc)
 
-    // **** SZŰRÉS ****
+    // szűrő kép (kernel) létrehozása (ugyanolyan méretű kell legyen, mint a preparedSrc)
+    val kernel = gaussianKernelEx(ksize, preparedSrc.size())
 
-    // szűrő kép létrehozása (ugyanolyan méretű és típusú kell legyen, mint a complexSrc)
-    // HIÁNYZÓ RÉSZ: csupa 1 érték helyett a megfelelő Gauss értékek legyenek a szűrő képben
+    // Fourier transzformáció a szűrő képen
+    val complexKernel = fourierTransformation(kernel)
 
-    // Próba 1: csupa 1 érték, az végső kép változatlan
-    val filterImg = Mat.ones(complexSrc.size(), complexSrc.type())
-
-    // Próba 2: csupa 0 érték, az végső kép teljesen üres (fekete)
-    //val filterImg = Mat.ones(complexSrc.size(), complexSrc.type())
-
-    // Próba 3: csupa 1 érték középen, csupa 0 érték azon kívül
-//    val filterImg = Mat.zeros(complexSrc.size(), complexSrc.type())
-//    for (i in 1..filterImg.rows())
-//        for (j in 1..filterImg.cols())
-//            if (i > floor(filterImg.rows() * 0.25) && i < floor(filterImg.rows() * 0.75))
-//                if (j > floor(filterImg.cols() * 0.25) && j < floor(filterImg.cols() * 0.75))
-//                    filterImg.put(i, j, 1.0, 0.0)
-
-    // a transzformált kép és a szűrő kép elemenként történő összeszorzása
-    Core.mulSpectrums(complexSrc, filterImg, complexSrc, 0)
-
-    // **** SZŰRÉS vége ****
+    // SZŰRÉS => a transzformált kép és a szűrő kép elemenként történő összeszorzása
+    Core.mulSpectrums(complexSrc, complexKernel, complexSrc, 0)
 
     // inverz Fourier transzformáció
-    return inverseFourierTransformation(complexSrc, src.size())
+    return inverseFourierTransformation(complexSrc, originalSize)
 }
 
-fun fourierTransformation(
+fun prepareFourierTransformation(
     src: Mat
 ): Mat {
     // az eredeti kép szürkeskálássá alakítása
@@ -104,10 +96,11 @@ fun fourierTransformation(
     Imgproc.cvtColor(src, graySrc, Imgproc.COLOR_BGR2GRAY)
 
     // a transzformációhoz optimális képméret meghatározása (a gyorsaság miatt szükséges)
-    val paddedSrc = Mat()
     val m = Core.getOptimalDFTSize(graySrc.rows())
     val n = Core.getOptimalDFTSize(graySrc.cols())
+
     // a szegélyen lévő új elemek kitöltése 0 értékekkel
+    val paddedSrc = Mat()
     Core.copyMakeBorder(
         graySrc,
         paddedSrc,
@@ -119,11 +112,17 @@ fun fourierTransformation(
         Scalar.all(0.0)
     )
 
-    // komplex komponensek létrehozása
+    return paddedSrc
+}
+
+fun fourierTransformation(
+    preparedSrc: Mat
+): Mat {
+    // a Fourier transzformáció eredménye komplex kép => komplex komponensek tárolása szükséges
     val planes: MutableList<Mat> = ArrayList()
-    paddedSrc.convertTo(paddedSrc, CvType.CV_32F)
-    planes.add(paddedSrc)
-    planes.add(Mat.zeros(paddedSrc.size(), CvType.CV_32F))
+    preparedSrc.convertTo(preparedSrc, CvType.CV_32F)
+    planes.add(preparedSrc)
+    planes.add(Mat.zeros(preparedSrc.size(), CvType.CV_32F))
 
     // komplex kép összeállítása
     val complexSrc = Mat()
@@ -145,11 +144,11 @@ fun inverseFourierTransformation(
     val planes: MutableList<Mat> = ArrayList()
     Core.split(complexSrc, planes)
 
-    // valós értékek normalizálása
+    // valós értékek (tagok) normalizálása
     var restoredSrc = Mat()
     Core.normalize(planes[0], restoredSrc, 0.0, 255.0, Core.NORM_MINMAX)
 
-    // szegélyek eldobása
+    // az előkészítés során hozzáadott szegélyek eldobása
     restoredSrc = restoredSrc.submat(Rect(0, 0, originalSize.width.toInt(), originalSize.height.toInt()))
 
     // a normalizált kép visszalakaítása szürkeskálássá
@@ -161,10 +160,14 @@ fun inverseFourierTransformation(
 fun gaussianKernel(
     ksize: Int = 3
 ): Mat {
-    val kernel = Imgproc.getGaussianKernel(ksize, 0.0)
+    // kérünk egy megfelelő méretű 1D-s kernelt
+    val kernel = Imgproc.getGaussianKernel(ksize, 0.0) // a szigma a 'ksize' alapján kerül meghatározásra
+
+    // kernel transzponálása
     val kernelT = Mat()
     Core.transpose(kernel, kernelT)
 
+    // a két mátrix összeszorzása => 2D-s kernel meghatározása
     val product = Mat()
     Core.gemm(kernel, kernelT, 1.0, Mat(), 0.0, product, 0)
     return product
@@ -174,7 +177,10 @@ fun gaussianKernelEx(
     ksize: Int,
     size: Size
 ): Mat {
+    // kérünk egy megfelelő méretű 2D-s kernelt
     val kernel = gaussianKernel(ksize)
+
+    // kernel beágyazása egy megfelelő méretű nagyobb kép bal felső sarkába
     val kernelEx = Mat()
     Core.copyMakeBorder(
         kernel,
