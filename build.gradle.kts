@@ -1,12 +1,12 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("jvm") version "1.6.10"
+    kotlin("jvm") version "1.9.20"
     application
 }
 
-group = "com.gkiss"
-version = "1.0-SNAPSHOT"
+group = "me.gkiss01"
+version = "1.0"
 
 repositories {
     mavenCentral()
@@ -23,7 +23,7 @@ tasks.test {
 }
 
 tasks.withType<KotlinCompile> {
-    kotlinOptions.jvmTarget = "16"
+    kotlinOptions.jvmTarget = "17"
 }
 
 application {
